@@ -3,7 +3,6 @@ import json
 import os
 import logging
 import base64
-import hashlib
 from typing import Any
 
 # AWS SDK - included in Lambda runtime by default, no need to package it
@@ -42,13 +41,8 @@ CORS_HEADERS = {
     "Access-Control-Allow-Origin": os.getenv("ALLOWED_ORIGIN", "*"),
     "Access-Control-Allow-Headers": "Content-Type",
     "Access-Control-Allow-Methods": "OPTIONS,POST",
+    "Content-Type": "application/json"
 }
-
-# --- In-Memory Cache (Module-Level) ---
-# Persists across warm Lambda invocations (same execution environment)
-# Caching repeated prompts avoids redundant Bedrock API calls
-# Each cached hit saves ~$0.00002-0.00005 in Bedrock costs
-_cache: dict[str, str] = {}
 
 
 def _resp(status: int, body: dict[str, Any]) -> dict[str, Any]:
@@ -87,10 +81,8 @@ def _get_http_method(event: dict) -> str:
     """
     # HTTP API format (cheaper, recommended)
     http_api_method = event.get("requestContext", {}).get("http", {}).get("method")
-    # REST API format (fallback for compatibility)
-    rest_api_method = event.get("httpMethod")
-    # Return whichever is available, or empty string
-    return http_api_method or rest_api_method or ""
+   
+    return http_api_method or ""
 
 
 def _parse_body(event: dict) -> dict:
@@ -121,36 +113,15 @@ def _parse_body(event: dict) -> dict:
     return json.loads(raw)
 
 
-def _get_cache_key(prompt: str) -> str:
-    """
-    Generate cache key from prompt text.
-
-    Uses MD5 hash for consistent, fixed-length keys.
-    Normalizes prompt (lowercase, stripped) to increase cache hits.
-    More cache hits = fewer Bedrock API calls = lower costs.
-
-    Args:
-        prompt: User's input text
-
-    Returns:
-        32-character hexadecimal hash string
-    """
-    # Normalize: lowercase and strip whitespace for better cache hit rate
-    normalized = prompt.lower().strip()
-    # MD5 is fast and sufficient for cache keys (not security-critical)
-    return hashlib.md5(normalized.encode()).hexdigest()
-
-
 def lambda_handler(event: dict, context: Any) -> dict[str, Any]:
     """
     Main Lambda handler for the serverless chatbot.
 
     Cost optimization strategies used:
-    1. In-memory caching to avoid redundant Bedrock calls
-    2. Input length validation to prevent token abuse
-    3. Low maxTokens setting to limit output costs
-    4. Low temperature for shorter, more focused responses
-    5. Minimal logging to reduce CloudWatch costs
+    1. Input length validation to prevent token abuse
+    2. Low maxTokens setting to limit output costs
+    3. Low temperature for shorter, more focused responses
+    4. Minimal logging to reduce CloudWatch costs
 
     Args:
         event: API Gateway event containing HTTP request data
@@ -194,14 +165,6 @@ def lambda_handler(event: dict, context: Any) -> dict[str, Any]:
     if len(prompt) > MAX_PROMPT_LENGTH:
         return _resp(400, {"error": f"Prompt exceeds {MAX_PROMPT_LENGTH} characters"})
 
-    # --- Cache Lookup ---
-    # Check if we've seen this prompt before (in this warm Lambda instance)
-    cache_key = _get_cache_key(prompt)
-    if cache_key in _cache:
-        # Cache hit! Return cached response without calling Bedrock
-        # This is essentially free - no Bedrock API costs
-        logger.info("Cache hit")
-        return _resp(200, {"answer": _cache[cache_key]})
 
     # --- Logging (Minimal) ---
     # Only log prompt length, not content (privacy + reduces log size)
@@ -228,7 +191,7 @@ def lambda_handler(event: dict, context: Any) -> dict[str, Any]:
             messages=messages,
             # System prompt for consistent chatbot behavior
             # Instructing brevity helps reduce output tokens = lower costs
-            system=[{"text": "You are a helpful, concise assistant. Keep responses brief."}],
+            system=[{"text": "You are a helpful, concise assistant. Keep responses brief. Use humor for every response."}],
             inferenceConfig={
                 # maxTokens: Limits output length - biggest cost control lever
                 # 150 tokens ≈ 100-120 words, sufficient for most answers
@@ -248,13 +211,6 @@ def lambda_handler(event: dict, context: Any) -> dict[str, Any]:
         # --- Extract Response ---
         # Response structure confirmed from AWS documentation example
         answer = response["output"]["message"]["content"][0]["text"]
-
-        # --- Cache Storage ---
-        # Store response for future identical prompts
-        # Limit cache size to prevent Lambda memory issues (256MB recommended)
-        # 100 entries × ~500 chars average = ~50KB, well within limits
-        if answer and len(_cache) < 100:
-            _cache[cache_key] = answer
 
         # --- Return Success Response ---
         return _resp(200, {"answer": answer})
