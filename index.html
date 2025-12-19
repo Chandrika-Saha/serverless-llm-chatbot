@@ -1,0 +1,532 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Serverless Chatbot</title>
+    <style>
+        /* --- CSS Reset & Base Styles --- */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        /* --- Chat Container --- */
+        .chat-container {
+            width: 100%;
+            max-width: 600px;
+            height: 80vh;
+            max-height: 700px;
+            background: #ffffff;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* --- Header --- */
+        .chat-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+
+        .chat-header h1 {
+            font-size: 1.5rem;
+            font-weight: 600;
+        }
+
+        .chat-header p {
+            font-size: 0.85rem;
+            opacity: 0.9;
+            margin-top: 5px;
+        }
+
+        /* --- Messages Area --- */
+        .chat-messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+            background: #f8f9fa;
+        }
+
+        /* --- Individual Message --- */
+        .message {
+            display: flex;
+            margin-bottom: 15px;
+            animation: fadeIn 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .message.user {
+            justify-content: flex-end;
+        }
+
+        .message.bot {
+            justify-content: flex-start;
+        }
+
+        .message-content {
+            max-width: 75%;
+            padding: 12px 18px;
+            border-radius: 18px;
+            font-size: 0.95rem;
+            line-height: 1.5;
+        }
+
+        .message.user .message-content {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-bottom-right-radius: 5px;
+        }
+
+        .message.bot .message-content {
+            background: white;
+            color: #333;
+            border: 1px solid #e0e0e0;
+            border-bottom-left-radius: 5px;
+        }
+
+        /* --- Typing Indicator --- */
+        .typing-indicator {
+            display: none;
+            padding: 12px 18px;
+            background: white;
+            border: 1px solid #e0e0e0;
+            border-radius: 18px;
+            border-bottom-left-radius: 5px;
+            width: fit-content;
+        }
+
+        .typing-indicator.show {
+            display: block;
+        }
+
+        .typing-indicator span {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            background: #667eea;
+            border-radius: 50%;
+            margin-right: 5px;
+            animation: bounce 1.4s infinite ease-in-out;
+        }
+
+        .typing-indicator span:nth-child(1) { animation-delay: 0s; }
+        .typing-indicator span:nth-child(2) { animation-delay: 0.2s; }
+        .typing-indicator span:nth-child(3) { animation-delay: 0.4s; margin-right: 0; }
+
+        @keyframes bounce {
+            0%, 60%, 100% { transform: translateY(0); }
+            30% { transform: translateY(-8px); }
+        }
+
+        /* --- Input Area --- */
+        .chat-input-area {
+            padding: 20px;
+            background: white;
+            border-top: 1px solid #e0e0e0;
+        }
+
+        .chat-input-form {
+            display: flex;
+            gap: 10px;
+        }
+
+        .chat-input {
+            flex: 1;
+            padding: 15px 20px;
+            border: 2px solid #e0e0e0;
+            border-radius: 25px;
+            font-size: 1rem;
+            outline: none;
+            transition: border-color 0.3s ease;
+        }
+
+        .chat-input:focus {
+            border-color: #667eea;
+        }
+
+        .chat-input:disabled {
+            background: #f5f5f5;
+            cursor: not-allowed;
+        }
+
+        .send-button {
+            padding: 15px 25px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 25px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .send-button:hover:not(:disabled) {
+            transform: scale(1.05);
+            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        .send-button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        /* --- Error Message --- */
+        .error-message {
+            background: #fee;
+            color: #c00;
+            padding: 10px 15px;
+            border-radius: 10px;
+            margin-bottom: 15px;
+            font-size: 0.9rem;
+            display: none;
+        }
+
+        .error-message.show {
+            display: block;
+        }
+
+        /* --- Scrollbar Styling --- */
+        .chat-messages::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .chat-messages::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        .chat-messages::-webkit-scrollbar-thumb {
+            background: #ccc;
+            border-radius: 3px;
+        }
+
+        .chat-messages::-webkit-scrollbar-thumb:hover {
+            background: #aaa;
+        }
+
+        /* --- Responsive Design --- */
+        @media (max-width: 480px) {
+            body {
+                padding: 0;
+            }
+
+            .chat-container {
+                height: 100vh;
+                max-height: 100vh;
+                border-radius: 0;
+            }
+
+            .message-content {
+                max-width: 85%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="chat-container">
+        <!-- Header -->
+        <div class="chat-header">
+            <h1>🤖 Serverless Chatbot</h1>
+            <p>Powered by Amazon Bedrock (Nova Micro)</p>
+        </div>
+
+        <!-- Messages Area -->
+        <div class="chat-messages" id="chatMessages">
+            <!-- Error Message Container -->
+            <div class="error-message" id="errorMessage"></div>
+
+            <!-- Welcome Message -->
+            <div class="message bot">
+                <div class="message-content">
+                    Hello! I'm your AI assistant. How can I help you today? 😊
+                </div>
+            </div>
+
+            <!-- Typing Indicator -->
+            <div class="typing-indicator" id="typingIndicator">
+                <span></span>
+                <span></span>
+                <span></span>
+            </div>
+        </div>
+
+        <!-- Input Area -->
+        <div class="chat-input-area">
+            <form class="chat-input-form" id="chatForm">
+                <input
+                    type="text"
+                    class="chat-input"
+                    id="userInput"
+                    placeholder="Type your message..."
+                    autocomplete="off"
+                    required
+                >
+                <button type="submit" class="send-button" id="sendButton">
+                    Send
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        // =============================================================
+        // CONFIGURATION
+        // =============================================================
+        
+        // Replace with your API Gateway Invoke URL
+        const API_URL = "https://qe3vz992k7.execute-api.us-east-2.amazonaws.com/chat";
+
+        // =============================================================
+        // DOM ELEMENTS
+        // =============================================================
+        
+        const chatMessages = document.getElementById("chatMessages");
+        const chatForm = document.getElementById("chatForm");
+        const userInput = document.getElementById("userInput");
+        const sendButton = document.getElementById("sendButton");
+        const typingIndicator = document.getElementById("typingIndicator");
+        const errorMessage = document.getElementById("errorMessage");
+
+        // =============================================================
+        // HELPER FUNCTIONS
+        // =============================================================
+
+        /**
+         * Scrolls the chat messages area to the bottom.
+         * Called after adding new messages to keep latest visible.
+         */
+        function scrollToBottom() {
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+
+        /**
+         * Shows the typing indicator animation.
+         * Displayed while waiting for API response.
+         */
+        function showTypingIndicator() {
+            typingIndicator.classList.add("show");
+            scrollToBottom();
+        }
+
+        /**
+         * Hides the typing indicator animation.
+         * Called when response is received or error occurs.
+         */
+        function hideTypingIndicator() {
+            typingIndicator.classList.remove("show");
+        }
+
+        /**
+         * Displays an error message to the user.
+         * Auto-hides after 5 seconds to avoid clutter.
+         * 
+         * @param {string} message - The error message to display
+         */
+        function showError(message) {
+            errorMessage.textContent = message;
+            errorMessage.classList.add("show");
+            
+            // Auto-hide after 5 seconds
+            setTimeout(() => {
+                errorMessage.classList.remove("show");
+            }, 5000);
+        }
+
+        /**
+         * Adds a message to the chat interface.
+         * Handles both user and bot messages with appropriate styling.
+         * 
+         * @param {string} content - The message text
+         * @param {string} sender - Either "user" or "bot"
+         */
+        function addMessage(content, sender) {
+            // Create message container
+            const messageDiv = document.createElement("div");
+            messageDiv.classList.add("message", sender);
+
+            // Create message content
+            const contentDiv = document.createElement("div");
+            contentDiv.classList.add("message-content");
+            contentDiv.textContent = content;
+
+            // Assemble and add to DOM
+            messageDiv.appendChild(contentDiv);
+            
+            // Insert before typing indicator so indicator stays at bottom
+            chatMessages.insertBefore(messageDiv, typingIndicator);
+            
+            // Scroll to show new message
+            scrollToBottom();
+        }
+
+        /**
+         * Toggles the input form enabled/disabled state.
+         * Prevents multiple simultaneous requests (saves API costs).
+         * 
+         * @param {boolean} disabled - Whether to disable the form
+         */
+        function setFormDisabled(disabled) {
+            userInput.disabled = disabled;
+            sendButton.disabled = disabled;
+        }
+
+        // =============================================================
+        // API COMMUNICATION
+        // =============================================================
+
+        /**
+         * Sends a message to the chatbot API and returns the response.
+         * 
+         * Uses fetch API with proper error handling.
+         * Timeout after 30 seconds to prevent hanging requests.
+         * 
+         * @param {string} prompt - The user's message
+         * @returns {Promise<string>} - The bot's response
+         * @throws {Error} - If request fails or times out
+         */
+        async function sendMessageToAPI(prompt) {
+            // Create abort controller for timeout
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 30000);
+
+            try {
+                const response = await fetch(API_URL, {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({ prompt }),
+                    signal: controller.signal
+                });
+
+                // Clear timeout since request completed
+                clearTimeout(timeoutId);
+
+                // Parse response JSON
+                const data = await response.json();
+
+                // Handle HTTP errors
+                if (!response.ok) {
+                    throw new Error(data.error || `HTTP ${response.status}`);
+                }
+
+                // Return the answer text
+                return data.answer;
+
+            } catch (error) {
+                // Clear timeout on error
+                clearTimeout(timeoutId);
+
+                // Handle specific error types
+                if (error.name === "AbortError") {
+                    throw new Error("Request timed out. Please try again.");
+                }
+
+                if (error.message === "Failed to fetch") {
+                    throw new Error("Network error. Check your connection.");
+                }
+
+                // Re-throw other errors
+                throw error;
+            }
+        }
+
+        // =============================================================
+        // EVENT HANDLERS
+        // =============================================================
+
+        /**
+         * Handles form submission when user sends a message.
+         * 
+         * Flow:
+         * 1. Validate input
+         * 2. Add user message to chat
+         * 3. Show typing indicator
+         * 4. Send to API
+         * 5. Add bot response to chat
+         * 6. Handle any errors
+         * 
+         * @param {Event} event - The form submit event
+         */
+        async function handleSubmit(event) {
+            // Prevent page reload
+            event.preventDefault();
+
+            // Get and validate input
+            const prompt = userInput.value.trim();
+            if (!prompt) return;
+
+            // Clear input immediately for better UX
+            userInput.value = "";
+
+            // Add user message to chat
+            addMessage(prompt, "user");
+
+            // Disable form to prevent multiple requests
+            setFormDisabled(true);
+
+            // Show typing indicator
+            showTypingIndicator();
+
+            try {
+                // Send to API and get response
+                const answer = await sendMessageToAPI(prompt);
+
+                // Hide typing indicator
+                hideTypingIndicator();
+
+                // Add bot response to chat
+                addMessage(answer, "bot");
+
+            } catch (error) {
+                // Hide typing indicator
+                hideTypingIndicator();
+
+                // Show error to user
+                showError(error.message || "Something went wrong. Please try again.");
+
+                console.error("Chat error:", error);
+            } finally {
+                // Re-enable form
+                setFormDisabled(false);
+
+                // Focus input for next message
+                userInput.focus();
+            }
+        }
+
+        // =============================================================
+        // INITIALIZATION
+        // =============================================================
+
+        // Attach form submit handler
+        chatForm.addEventListener("submit", handleSubmit);
+
+        // Focus input on page load
+        userInput.focus();
+
+        // Optional: Allow Enter key to submit (already works via form)
+        // Optional: Shift+Enter for newline (would need textarea instead of input)
+    </script>
+</body>
+</html>
