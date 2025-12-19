@@ -2,7 +2,7 @@
 
 A production-ready, cost-optimized AI chatbot built entirely on AWS serverless architecture, demonstrating cloud-native ML system design and deployment.
 
-[![Demo Video](demo-thumbnail.png)](demo.mp4)
+[![Demo Video](demo-thumbnail.png)](demo.gif)
 
 *Real-time interaction with the serverless chatbot*
 
