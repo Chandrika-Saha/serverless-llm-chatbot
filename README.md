@@ -2,7 +2,7 @@
 
 A production-ready, cost-optimized AI chatbot built entirely on AWS serverless architecture, demonstrating cloud-native ML system design and deployment.
 
-![Demo](demo.gif)
+![Demo](assets/demo.gif)
 
 *Real-time interaction with the serverless chatbot*
 
@@ -103,7 +103,7 @@ User Request → API Gateway → Lambda Function → Amazon Bedrock (Nova Micro)
   - Resources: Both foundation model ARN and inference profile ARN
   - *Note: Both ARNs required for successful invocation*
 
-[Screenshot here]
+![IAM Role Configuration](assets/IAM.png)
 
 ### 2. Deploy Lambda Function
 - Navigate to AWS Lambda → Create Function
@@ -111,21 +111,21 @@ User Request → API Gateway → Lambda Function → Amazon Bedrock (Nova Micro)
 - Handler: `lambda_function.lambda_handler`
 - Attach IAM role from Step 1
 
-[Screenshot here]
+![Lambda](assets/lambda.png)
 
 ### 3. Create API Gateway HTTP API
 - Navigate to API Gateway → Create HTTP API
 - Add Lambda integration
 - Note the API endpoint URL
 
-[Screenshot here]
+![API](assets/API.png)
 
 ### 4. Deploy Frontend to S3
 - Create S3 bucket with static website hosting enabled
 - Upload HTML/CSS/JS files
 - Set bucket policy for public read access
 
-[Screenshot here]
+![Static Website](assets/demo-thumbnail.png)
 ---
 
 ## 🎓 Key Learnings
